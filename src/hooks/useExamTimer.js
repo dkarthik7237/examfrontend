@@ -14,21 +14,24 @@ import api from '../api/axios';
  * @param {number} initialSeconds - from server on session load
  * @param {function} onExpire - called when time runs out
  */
-const useExamTimer = (submissionId, examId, initialSeconds, onExpire) => {
+const useExamTimer = (submissionId, examId, initialSeconds, onExpire, onSync) => {
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds ?? 0);
   const intervalRef    = useRef(null);
   const syncIntervalRef = useRef(null);
   const expiredRef     = useRef(false);
   const onExpireRef    = useRef(onExpire);
+  const onSyncRef      = useRef(onSync);
 
   // Keep ref current without triggering re-runs
   useEffect(() => { onExpireRef.current = onExpire; }, [onExpire]);
+  useEffect(() => { onSyncRef.current = onSync; }, [onSync]);
 
   // Sync with server
   const syncWithServer = async () => {
     try {
       const { data } = await api.get(`/student/exams/${examId}/session`);
       setSecondsLeft(data.remainingSeconds);
+      if (onSyncRef.current) onSyncRef.current(data);
     } catch (_) {
       // If session has ended the backend returns an error — timer will hit 0 naturally
     }

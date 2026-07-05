@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, CheckCircle, XCircle, MinusCircle, Save,
-  Flag, AlertTriangle, User, BookOpen, Clock, Target
+  Flag, AlertTriangle, User, BookOpen, Clock, Target, Shield
 } from 'lucide-react';
 import api from '../../api/axios';
 import Sidebar from '../../components/common/Sidebar';
@@ -206,6 +206,40 @@ const SubmissionDetail = () => {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Proctoring Log Section */}
+          <div className="card mb-6 bg-white border border-surface-200 shadow-sm rounded-2xl p-6">
+            <h2 className="text-lg font-bold text-surface-900 mb-4 flex items-center gap-2">
+              <Shield size={18} className="text-brand-500" />
+              Proctoring Audit Log (Anti-Cheat History)
+            </h2>
+            {submission.proctoringLogs && submission.proctoringLogs.length > 0 ? (
+              <div className="space-y-4 relative before:absolute before:left-[14px] before:top-2 before:bottom-2 before:w-0.5 before:bg-surface-200">
+                {submission.proctoringLogs.map((log, index) => {
+                  let badgeColor = 'bg-surface-100 text-surface-600 border-surface-200';
+                  if (log.event === 'Exam Started') badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                  else if (log.event === 'Tab Switch (Strike)') badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+                  else if (log.event === 'Debarred') badgeColor = 'bg-red-50 text-red-700 border-red-200';
+                  else if (log.event.startsWith('Exam Submitted') || log.event.startsWith('Auto-Submitted')) badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+                  return (
+                    <div key={index} className="flex items-start gap-4 pl-8 relative">
+                      <div className="absolute left-[9px] top-[7px] w-3.5 h-3.5 rounded-full border-2 border-brand-500 bg-white z-10" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-bold border ${badgeColor}`}>{log.event}</span>
+                          <span className="text-xs text-surface-400 font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                        <p className="text-sm text-surface-600 font-medium">{log.details}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-surface-400">No proctoring logs recorded for this submission.</p>
+            )}
           </div>
 
           {/* Question reviews */}

@@ -7,7 +7,7 @@ import {
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import useExamTimer from '../../hooks/useExamTimer';
-import { useSocket } from '../../context/SocketContext';
+import Sidebar from '../../components/common/Sidebar';
 import { toast } from 'react-toastify';
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
@@ -63,7 +63,6 @@ const TimeExpiredOverlay = () => (
 const ExamSession = () => {
   const { examId } = useParams();
   const navigate = useNavigate();
-  const { socket } = useSocket();
 
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -116,10 +115,6 @@ const ExamSession = () => {
           handleAutoSubmit(data.submission._id);
         }
 
-        // Join socket room for this session
-        if (socket && data.submission._id) {
-          socket.emit('student:join_session', { submissionId: data.submission._id });
-        }
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load exam session');
       } finally {
@@ -129,17 +124,6 @@ const ExamSession = () => {
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examId]);
-
-  // Socket listeners
-  useEffect(() => {
-    if (!socket) return;
-    socket.on('exam:debarred', () => setOverlaySynced('debarred'));
-    socket.on('exam:time_expired', () => setOverlaySynced('expired'));
-    return () => {
-      socket.off('exam:debarred');
-      socket.off('exam:time_expired');
-    };
-  }, [socket]);
 
   // ── Page Visibility Anti-Cheat ─────────────────────────────────
   useEffect(() => {
@@ -179,11 +163,20 @@ const ExamSession = () => {
     }
   }, [handleAutoSubmit]);
 
+  const handleSync = useCallback((data) => {
+    if (data?.submission?.status === 'Debarred') {
+      setOverlaySynced('debarred');
+    } else if (['Submitted', 'Graded'].includes(data?.submission?.status)) {
+      setOverlaySynced('submitted');
+    }
+  }, []);
+
   const { formatted, isWarning, isDanger } = useExamTimer(
     session?.submission?._id,
     examId,
     session?.remainingSeconds,
-    handleTimeExpired
+    handleTimeExpired,
+    handleSync
   );
 
   // ── Answer Selection ───────────────────────────────────────────
@@ -201,9 +194,28 @@ const ExamSession = () => {
       });
     } catch (err) {
       setAnswers((prev) => { const n = { ...prev }; delete n[questionId]; return n; });
-      toast.error('Failed to save answer — please try again');
+      
+      const status = err.response?.status;
+      const errMsg = err.response?.data?.message;
+      
+      if (status === 403 || status === 400) {
+        try {
+          const { data } = await api.get(`/student/exams/${examId}/session`);
+          if (data?.submission?.status === 'Debarred') {
+            setOverlaySynced('debarred');
+          } else if (['Submitted', 'Graded'].includes(data?.submission?.status)) {
+            setOverlaySynced('submitted');
+          } else {
+            setOverlaySynced('expired');
+          }
+        } catch (_) {
+          setOverlaySynced('expired');
+        }
+      } else {
+        toast.error(errMsg || 'Failed to save answer — please try again');
+      }
     }
-  }, [session]);
+  }, [session, examId]);
 
   // ── Manual Submit ──────────────────────────────────────────────
   const handleSubmit = async () => {

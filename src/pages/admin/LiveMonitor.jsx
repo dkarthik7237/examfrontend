@@ -3,7 +3,6 @@ import { Activity, Wifi, WifiOff, AlertTriangle, Shield, RefreshCw, Users } from
 import api from '../../api/axios';
 import Sidebar from '../../components/common/Sidebar';
 import StatusBadge from '../../components/common/StatusBadge';
-import { useSocket } from '../../context/SocketContext';
 
 const StrikeBar = ({ count, max }) => {
   const pct = Math.min((count / max) * 100, 100);
@@ -73,9 +72,6 @@ const LiveMonitor = () => {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
-  const { socket, connected } = useSocket();
-  const sessionsRef = useRef(sessions);
-  sessionsRef.current = sessions;
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -89,47 +85,9 @@ const LiveMonitor = () => {
 
   useEffect(() => {
     fetchSessions();
-    const poll = setInterval(fetchSessions, 15_000);
+    const poll = setInterval(fetchSessions, 5000);
     return () => clearInterval(poll);
   }, [fetchSessions]);
-
-  // Real-time socket events
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleStrikeUpdate = (data) => {
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.submissionId === data.submissionId
-            ? { ...s, strikeCount: data.strikeCount, status: data.status }
-            : s
-        )
-      );
-      setLastUpdate(new Date());
-    };
-
-    const handleDebarred = (data) => {
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.submissionId === data.submissionId
-            ? { ...s, status: 'Debarred', strikeCount: data.strikeCount }
-            : s
-        )
-      );
-    };
-
-    const handleForceSubmit = () => { fetchSessions(); };
-
-    socket.on('strike:update', handleStrikeUpdate);
-    socket.on('student:debarred', handleDebarred);
-    socket.on('exam:force_submitted', handleForceSubmit);
-
-    return () => {
-      socket.off('strike:update', handleStrikeUpdate);
-      socket.off('student:debarred', handleDebarred);
-      socket.off('exam:force_submitted', handleForceSubmit);
-    };
-  }, [socket, fetchSessions]);
 
   const activeCount   = sessions.filter((s) => s.status === 'Pending').length;
   const debarredCount = sessions.filter((s) => s.status === 'Debarred').length;
@@ -148,13 +106,9 @@ const LiveMonitor = () => {
               <p className="text-surface-500 mt-1">Real-time exam session tracking</p>
             </div>
             <div className="flex items-center gap-3">
-              <div className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full font-medium border ${
-                connected
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-red-50 text-red-600 border-red-200'
-              }`}>
-                {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
-                {connected ? 'Live' : 'Disconnected'}
+              <div className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
+                <RefreshCw size={12} className="animate-spin" />
+                Auto-polling
               </div>
               <button className="btn-secondary btn-sm" onClick={fetchSessions}>
                 <RefreshCw size={14} /> Refresh
@@ -200,7 +154,7 @@ const LiveMonitor = () => {
 
           {sessions.length > 0 && (
             <p className="text-xs text-surface-400 text-right mt-4">
-              Last updated: {lastUpdate.toLocaleTimeString()} · Auto-refreshes every 15s
+              Last updated: {lastUpdate.toLocaleTimeString()} · Auto-refreshes every 5s
             </p>
           )}
         </div>

@@ -19,7 +19,13 @@ import { toast } from 'react-toastify';
 const toDatetimeLocal = (val) => {
   if (!val) return '';
   try {
-    return new Date(val).toISOString().slice(0, 16);
+    const d = new Date(val);
+    const YYYY = d.getFullYear();
+    const MM = String(d.getMonth() + 1).padStart(2, '0');
+    const DD = String(d.getDate()).padStart(2, '0');
+    const HH = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${YYYY}-${MM}-${DD}T${HH}:${mm}`;
   } catch {
     return '';
   }
@@ -125,7 +131,12 @@ const ExamForm = ({ courseId, initial = {}, onSave, onClose }) => {
 
     setLoading(true);
     try {
-      await onSave({ ...form, courseId });
+      const formattedForm = {
+        ...form,
+        startTime: new Date(form.startTime).toISOString(),
+        endTime: new Date(form.endTime).toISOString(),
+      };
+      await onSave({ ...formattedForm, courseId });
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save exam');
